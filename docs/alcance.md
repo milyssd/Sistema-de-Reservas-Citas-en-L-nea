@@ -1,0 +1,33 @@
+# Alcance y aceptación de la entrega
+
+La implementación incluye el monorepo, API, web, aplicación móvil, datos, pruebas y configuración de despliegue. Este documento distingue las funciones implementadas y comprobadas localmente de la aceptación que depende del servidor, dominio o dispositivo del operador. Los resultados del último conjunto de pruebas están en `VALIDATION.md`.
+
+| Área                  | Implementación                                                                                                                   | Evidencia y alcance                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Monorepo              | pnpm, Turborepo, TypeScript, lint, formato, CI, scripts y ejemplos de entorno                                                    | Instalación con lockfile y comprobaciones locales; CI remoto se verifica al publicar                          |
+| Datos                 | MySQL/Prisma, UUID, ámbito por negocio, migraciones, seed idempotente y snapshots                                                | Migraciones en MySQL y repetición de setup; sin sobrescribir contraseñas                                      |
+| Auth                  | Registro, JWT corto, rotación/reutilización de refresh, sesiones, roles, TOTP, recuperación/verificación                         | Pruebas de autenticación, permisos y aislamiento; envío SMTP probado contra servidor TLS de prueba            |
+| API                   | REST versionada, OpenAPI, problem+json, requestId, Zod, If-Match, idempotencia, health/ready                                     | Contrato generado y peticiones funcionales reales                                                             |
+| Disponibilidad        | Zonas IANA/DST, medianoche, horarios, bloqueos, buffers, clases/cupos, antelación y cache Redis/local                            | Motor y base real comprobados; writes siempre revalidan bajo bloqueo                                          |
+| Servicios encadenados | Servicios con profesionales iguales o distintos, asignación por etapa, overrides de duración/precio, holds de todos los recursos | Pruebas de bloqueos ordenados, concurrencia, reasignación y snapshots; bandera por negocio                    |
+| Reservas              | Cuenta e invitado, gestión segura, reprogramar/cancelar, estados, iCal y agenda STAFF aislada                                    | 12 solicitudes al mismo turno producen una reserva; 6 reintentos simultáneos producen la misma reserva        |
+| Antiabuso             | Límites compartidos, pendientes/no-shows y prueba de trabajo adaptativa para invitados                                           | Desafío firmado ligado a IP/tenant/payload/clave, caducidad y protección contra reutilización                 |
+| Pagos                 | QR/transferencia/local, recibos privados optimizados, confirmación/rechazo/retención y devolución parcial o total                | Ledger inmutable, idempotencia, rechazo de sobredevolución y auditoría; sin verificación bancaria automática  |
+| Administración        | Calendario, arrastrar/editar, CRUD, CRM/historial, usuarios/roles, políticas, templates, mantenimiento, reportes y auditoría     | Navegación y operaciones verificadas por API y navegador                                                      |
+| Reportes              | Ingresos netos de devoluciones, ocupación disponible/real, servicios, horas pico, cancelación/no-show, CSV                       | Intervalos unidos, bloqueos, horario nocturno/DST; reportes históricos usan horarios actualmente configurados |
+| Colas                 | BullMQ con Redis y fallback node-cron/DB, workers separados, jobs deduplicados, reintentos y recuperación                        | MySQL y Redis reales, entrega SMTP TLS y errores/reintentos; adapters push probados con transporte simulado   |
+| Tiempo real           | SSE público de disponibilidad y agenda autenticada, refresco cada 5 s, namespace cache invalidado                                | Sondeo DB compartido entre procesos; no depende de un bus en memoria de una sola réplica                      |
+| Web                   | Next.js mantenido, flujo completo, cuenta, panel, PWA offline, consentimiento, SEO e i18n preparado                              | 7 E2E aprobadas; Lighthouse final 96/100/100/100; detalle en VALIDATION.md                                    |
+| Móvil                 | Expo 58: registro/login, reservar/gestionar, agenda STAFF, calendario, push, inbox, perfil, sesiones y deep links                | 16 pruebas y export Android de 725 módulos; no ejecutado en hardware físico                                   |
+| Cliente API           | Tipos generados OpenAPI usados por ambas apps; reintentos seguros y claves conservadas                                           | Typecheck, 4 pruebas y smoke de login móvil/listado/logout contra API real                                    |
+| Despliegue            | PM2 cluster, Nginx local, worker y Cloudflare Tunnel                                                                             | Configuración y nginx -t local; el servidor y dominio del usuario no se han publicado                         |
+
+## Aceptación que necesita el entorno del operador
+
+- Configurar dominio/túnel, credenciales reales del negocio y probar la instalación en el servidor de destino, incluido firewall y restauración de respaldos.
+- Configurar SMTP/Web Push/Expo con destinatarios autorizados. SMTP TLS se probó localmente; esto no demuestra entrega de un proveedor externo ni permisos push de un teléfono.
+- Instalar una compilación Android/iOS firmada en dispositivos físicos, configurar APNs/FCM y comprobar calendario, notificaciones y accesibilidad con las herramientas del sistema.
+- Adaptar textos de privacidad, políticas y datos del negocio; revisar manualmente teclado y lector de pantalla y repetir Lighthouse sobre el dominio real.
+- Sustituir el parche local de node-forge cuando exista una corrección oficial. La auditoría conserva ese aviso por versión; la regresión y su corrección se documentan en `DEPENDENCY-SECURITY.md`.
+
+No se incluye una pasarela bancaria o la API oficial de WhatsApp/SMS: la versión solicitada usa pagos manuales, enlaces WhatsApp y interfaces extensibles. La v1 sirve un negocio por configuración; el modelo y las autorizaciones están preparados para mantener aislamiento cuando se agregue resolución de varios negocios.

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Agenda abierta",
+    "slug": "agenda-abierta",
+    "scheme": "agendaabierta",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "bo.agendaabierta.app"
+    },
+    "android": {
+      "package": "bo.agendaabierta.app",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Permite que Agenda abierta agregue las citas que elijas a tu calendario."
+        }
+      ]
+    ]
+  }
+}

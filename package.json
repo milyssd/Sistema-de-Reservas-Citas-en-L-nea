@@ -1,0 +1,39 @@
+{
+  "name": "agenda-abierta",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel --filter=!@reservas/mobile",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test && pnpm test:tooling",
+    "test:integration": "pnpm --filter @reservas/api test:integration",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "db:generate": "pnpm --filter @reservas/api exec prisma generate",
+    "db:migrate": "pnpm --filter @reservas/api exec prisma migrate deploy",
+    "db:seed": "pnpm --filter @reservas/api exec tsx prisma/seed.ts",
+    "api:generate-client": "pnpm --filter @reservas/api-client generate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky",
+    "test:tooling": "node --test scripts/tooling-security.test.cjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.3",
+    "eslint": "^8.57.1",
+    "@typescript-eslint/parser": "^8.31.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.0",
+    "prettier": "^3.5.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,json,md,css,yaml,yml}": "prettier --write"
+  }
+}

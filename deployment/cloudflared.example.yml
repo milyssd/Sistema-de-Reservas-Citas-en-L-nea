@@ -1,0 +1,10 @@
+# Copiar fuera del repositorio, por ejemplo /etc/cloudflared/config.yml.
+# Sustituir UUID y hostname por los resultados de cloudflared tunnel create.
+tunnel: REEMPLAZAR_UUID_DEL_TUNEL
+credentials-file: /etc/cloudflared/REEMPLAZAR_UUID_DEL_TUNEL.json
+ingress:
+  - hostname: reservas.example.com
+    service: http://127.0.0.1:8080
+    originRequest:
+      connectTimeout: 10s
+  - service: http_status:404

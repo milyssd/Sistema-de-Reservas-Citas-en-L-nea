@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+*.ico binary
+# Preserve applied SQL migrations exactly as emitted by Prisma, including final newlines.
+apps/api/prisma/migrations/**/migration.sql whitespace=-blank-at-eof

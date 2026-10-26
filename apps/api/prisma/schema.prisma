@@ -1,0 +1,636 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  STAFF
+  ADMIN
+  OWNER
+  SUPERADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  EXPIRED
+}
+
+enum BookingSource {
+  WEB
+  MOBILE
+  ADMIN
+  WALK_IN
+}
+
+enum PaymentMethod {
+  QR
+  TRANSFER
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  SUBMITTED
+  CONFIRMED
+  REJECTED
+  REFUNDED
+  RETAINED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WEB_PUSH
+  EXPO_PUSH
+  IN_APP
+}
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum TokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  BOOKED
+  CANCELLED
+}
+
+model Business {
+  id                   String   @id @default(uuid()) @db.Char(36)
+  slug                 String   @unique @db.VarChar(100)
+  name                 String   @db.VarChar(150)
+  description          String?  @db.Text
+  currency             String   @default("BOB") @db.Char(3)
+  locale               String   @default("es-BO") @db.VarChar(16)
+  timezone             String   @default("America/La_Paz") @db.VarChar(64)
+  logoUrl              String?  @db.VarChar(512)
+  brandColor           String   @default("#146C94") @db.Char(7)
+  minimumNoticeMinutes Int      @default(60)
+  maximumAdvanceDays   Int      @default(60)
+  slotIntervalMinutes  Int      @default(15)
+  cancellationHours    Int      @default(12)
+  holdMinutes          Int      @default(10)
+  paymentExpiryHours   Int      @default(24)
+  maxPendingBookings   Int      @default(3)
+  maxNoShows           Int      @default(3)
+  autoConfirm          Boolean  @default(true)
+  assignmentRule       String   @default("LEAST_BUSY") @db.VarChar(20)
+  maintenanceMode      Boolean  @default(false)
+  featureFlags         Json?
+  version              Int      @default(1)
+  createdAt            DateTime @default(now()) @db.DateTime(3)
+  updatedAt            DateTime @updatedAt @db.DateTime(3)
+  users                User[]
+  locations            Location[]
+  categories           ServiceCategory[]
+  services             Service[]
+  staff                Staff[]
+  customers            Customer[]
+  bookings             Booking[]
+  settings             Setting[]
+}
+
+model User {
+  id                    String    @id @default(uuid()) @db.Char(36)
+  businessId            String    @db.Char(36)
+  email                 String    @db.VarChar(254)
+  name                  String    @db.VarChar(120)
+  phone                 String?   @db.VarChar(20)
+  passwordHash          String    @db.VarChar(255)
+  role                  Role      @default(CLIENT)
+  emailVerifiedAt       DateTime? @db.DateTime(3)
+  failedLoginAttempts   Int       @default(0)
+  lockedUntil           DateTime? @db.DateTime(3)
+  totpSecret            String?   @db.VarChar(512)
+  totpEnabled           Boolean   @default(false)
+  notificationPreferences Json?
+  deletedAt             DateTime? @db.DateTime(3)
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now()) @db.DateTime(3)
+  updatedAt             DateTime  @updatedAt @db.DateTime(3)
+  business              Business  @relation(fields: [businessId], references: [id])
+  customer              Customer?
+  staff                 Staff?
+  sessions              RefreshSession[]
+  authTokens            AuthToken[]
+  deviceTokens          DeviceToken[]
+  notifications         Notification[]
+  recordedRefunds       PaymentRefund[]
+  @@unique([businessId, email])
+  @@unique([businessId, id])
+  @@index([businessId, role])
+}
+
+model Location {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  name       String   @db.VarChar(150)
+  address    String   @db.VarChar(300)
+  timezone   String   @default("America/La_Paz") @db.VarChar(64)
+  phone      String?  @db.VarChar(20)
+  latitude   Decimal? @db.Decimal(10, 7)
+  longitude  Decimal? @db.Decimal(10, 7)
+  mapUrl     String?  @db.VarChar(512)
+  active     Boolean  @default(true)
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @db.DateTime(3)
+  updatedAt  DateTime @updatedAt @db.DateTime(3)
+  business   Business @relation(fields: [businessId], references: [id])
+  staff      Staff[]
+  workingHours WorkingHours[]
+  timeOff    TimeOff[]
+  bookings   Booking[]
+  holds      Hold[]
+  waitlistEntries WaitlistEntry[]
+  @@unique([businessId, id])
+  @@index([businessId, active])
+}
+
+model ServiceCategory {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  name       String   @db.VarChar(100)
+  sortOrder  Int      @default(0)
+  active     Boolean  @default(true)
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @db.DateTime(3)
+  updatedAt  DateTime @updatedAt @db.DateTime(3)
+  business   Business @relation(fields: [businessId], references: [id])
+  services   Service[]
+  @@unique([businessId, name])
+  @@unique([businessId, id])
+}
+
+model Service {
+  id                  String   @id @default(uuid()) @db.Char(36)
+  businessId          String   @db.Char(36)
+  categoryId          String?  @db.Char(36)
+  name                String   @db.VarChar(150)
+  description         String?  @db.Text
+  durationMinutes     Int
+  bufferBeforeMinutes Int      @default(0)
+  bufferAfterMinutes  Int      @default(0)
+  price               Decimal  @db.Decimal(10, 2)
+  depositAmount       Decimal  @default(0) @db.Decimal(10, 2)
+  depositPercent      Int?
+  capacity            Int      @default(1)
+  active              Boolean  @default(true)
+  onlineBookable      Boolean  @default(true)
+  sortOrder           Int      @default(0)
+  version             Int      @default(1)
+  createdAt           DateTime @default(now()) @db.DateTime(3)
+  updatedAt           DateTime @updatedAt @db.DateTime(3)
+  business            Business @relation(fields: [businessId], references: [id])
+  category            ServiceCategory? @relation(fields: [businessId, categoryId], references: [businessId, id])
+  staffServices       StaffService[]
+  bookingItems        BookingItem[]
+  holdItems           HoldItem[]
+  holds               Hold[]
+  waitlistEntries     WaitlistEntry[]
+  @@unique([businessId, id])
+  @@index([businessId, active, onlineBookable])
+}
+
+model Staff {
+  id             String   @id @default(uuid()) @db.Char(36)
+  businessId     String   @db.Char(36)
+  locationId     String   @db.Char(36)
+  userId         String?  @unique @db.Char(36)
+  name           String   @db.VarChar(120)
+  bio            String?  @db.Text
+  photoUrl       String?  @db.VarChar(512)
+  isResource     Boolean  @default(false)
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  calendarTokenHash String? @db.Char(64)
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @db.DateTime(3)
+  business       Business @relation(fields: [businessId], references: [id])
+  location       Location @relation(fields: [businessId, locationId], references: [businessId, id])
+  user           User?    @relation(fields: [businessId, userId], references: [businessId, id])
+  staffServices  StaffService[]
+  workingHours   WorkingHours[]
+  timeOff        TimeOff[]
+  bookings       Booking[]
+  bookingItems   BookingItem[]
+  holdItems      HoldItem[]
+  holds          Hold[]
+  waitlistEntries WaitlistEntry[]
+  @@unique([businessId, id])
+  @@unique([businessId, userId])
+  @@index([businessId, locationId, active])
+}
+
+model StaffService {
+  id              String   @id @default(uuid()) @db.Char(36)
+  businessId      String   @db.Char(36)
+  staffId         String   @db.Char(36)
+  serviceId       String   @db.Char(36)
+  durationMinutes Int?
+  price           Decimal? @db.Decimal(10, 2)
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @db.DateTime(3)
+  staff           Staff    @relation(fields: [businessId, staffId], references: [businessId, id], onDelete: Cascade)
+  service         Service  @relation(fields: [businessId, serviceId], references: [businessId, id], onDelete: Cascade)
+  @@unique([businessId, staffId, serviceId])
+}
+
+model WorkingHours {
+  id           String   @id @default(uuid()) @db.Char(36)
+  businessId   String   @db.Char(36)
+  staffId      String   @db.Char(36)
+  locationId   String   @db.Char(36)
+  dayOfWeek    Int
+  startMinute  Int
+  endMinute    Int
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @db.DateTime(3)
+  updatedAt    DateTime @updatedAt @db.DateTime(3)
+  staff        Staff    @relation(fields: [businessId, staffId], references: [businessId, id], onDelete: Cascade)
+  location     Location @relation(fields: [businessId, locationId], references: [businessId, id])
+  @@unique([businessId, staffId, dayOfWeek, startMinute])
+  @@index([businessId, locationId, dayOfWeek])
+}
+
+model TimeOff {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  staffId    String?  @db.Char(36)
+  locationId String   @db.Char(36)
+  startAt    DateTime @db.DateTime(3)
+  endAt      DateTime @db.DateTime(3)
+  reason     String?  @db.VarChar(200)
+  isHoliday  Boolean  @default(false)
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @db.DateTime(3)
+  updatedAt  DateTime @updatedAt @db.DateTime(3)
+  staff      Staff?   @relation(fields: [businessId, staffId], references: [businessId, id])
+  location   Location @relation(fields: [businessId, locationId], references: [businessId, id])
+  @@index([businessId, locationId, startAt, endAt])
+  @@index([staffId, startAt])
+}
+
+model Customer {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  userId     String?  @unique @db.Char(36)
+  name       String   @db.VarChar(120)
+  email      String   @db.VarChar(254)
+  phone      String   @db.VarChar(20)
+  internalNotes String? @db.Text
+  tags       Json?
+  noShowCount Int     @default(0)
+  blocked    Boolean  @default(false)
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @db.DateTime(3)
+  updatedAt  DateTime @updatedAt @db.DateTime(3)
+  business   Business @relation(fields: [businessId], references: [id])
+  user       User?    @relation(fields: [businessId, userId], references: [businessId, id])
+  bookings   Booking[]
+  waitlistEntries WaitlistEntry[]
+  reviews    Review[]
+  @@unique([businessId, email])
+  @@unique([businessId, userId])
+  @@unique([businessId, id])
+}
+
+model Booking {
+  id              String        @id @default(uuid()) @db.Char(36)
+  code            String        @unique @db.Char(8)
+  businessId      String        @db.Char(36)
+  locationId      String        @db.Char(36)
+  customerId      String        @db.Char(36)
+  staffId         String        @db.Char(36)
+  startAt         DateTime      @db.DateTime(3)
+  endAt           DateTime      @db.DateTime(3)
+  status          BookingStatus @default(PENDING)
+  source          BookingSource @default(WEB)
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  depositAmount   Decimal       @default(0) @db.Decimal(10, 2)
+  currency        String        @default("BOB") @db.Char(3)
+  notes           String?       @db.Text
+  cancellationReason String?    @db.VarChar(500)
+  manageTokenHash String?       @db.Char(64)
+  expiresAt       DateTime?     @db.DateTime(3)
+  cancelledAt     DateTime?     @db.DateTime(3)
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now()) @db.DateTime(3)
+  updatedAt       DateTime      @updatedAt @db.DateTime(3)
+  business        Business      @relation(fields: [businessId], references: [id])
+  location        Location      @relation(fields: [businessId, locationId], references: [businessId, id])
+  customer        Customer      @relation(fields: [businessId, customerId], references: [businessId, id])
+  staff           Staff         @relation(fields: [businessId, staffId], references: [businessId, id])
+  items           BookingItem[]
+  payments        Payment[]
+  reminders       Reminder[]
+  review          Review?
+  slotClaims      SlotClaim[]
+  @@unique([businessId, id])
+  @@index([staffId, startAt])
+  @@index([businessId, startAt])
+  @@index([customerId, startAt])
+  @@index([businessId, status, expiresAt])
+}
+
+model BookingItem {
+  id                  String   @id @default(uuid()) @db.Char(36)
+  businessId          String   @db.Char(36)
+  bookingId           String   @db.Char(36)
+  serviceId           String   @db.Char(36)
+  staffId             String   @db.Char(36)
+  serviceName         String   @db.VarChar(150)
+  durationMinutes     Int
+  bufferBeforeMinutes Int      @default(0)
+  bufferAfterMinutes  Int      @default(0)
+  price               Decimal  @db.Decimal(10, 2)
+  depositAmount       Decimal  @default(0) @db.Decimal(10, 2)
+  capacity            Int      @default(1)
+  startAt             DateTime @db.DateTime(3)
+  endAt               DateTime @db.DateTime(3)
+  position            Int      @default(0)
+  booking             Booking  @relation(fields: [businessId, bookingId], references: [businessId, id], onDelete: Cascade)
+  service             Service  @relation(fields: [businessId, serviceId], references: [businessId, id])
+  staff               Staff    @relation(fields: [businessId, staffId], references: [businessId, id])
+  @@index([staffId, startAt, endAt])
+  @@index([businessId, bookingId])
+}
+
+// A transactional unique backstop for each occupied minute and capacity seat.
+// Writers also serialize on Staff with SELECT ... FOR UPDATE and check overlaps.
+model SlotClaim {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  staffId    String   @db.Char(36)
+  bookingId  String   @db.Char(36)
+  minute     DateTime @db.DateTime(3)
+  seat       Int      @default(0)
+  booking    Booking  @relation(fields: [businessId, bookingId], references: [businessId, id], onDelete: Cascade)
+  @@unique([businessId, staffId, minute, seat])
+  @@index([businessId, bookingId])
+}
+
+model Hold {
+  id                  String   @id @default(uuid()) @db.Char(36)
+  businessId          String   @db.Char(36)
+  locationId          String   @db.Char(36)
+  staffId             String   @db.Char(36)
+  serviceId           String   @db.Char(36)
+  tokenHash           String   @db.Char(64)
+  serviceIds          Json?
+  startAt             DateTime @db.DateTime(3)
+  endAt               DateTime @db.DateTime(3)
+  bufferBeforeMinutes Int      @default(0)
+  bufferAfterMinutes  Int      @default(0)
+  expiresAt           DateTime @db.DateTime(3)
+  consumedAt          DateTime? @db.DateTime(3)
+  createdAt           DateTime @default(now()) @db.DateTime(3)
+  location            Location @relation(fields: [businessId, locationId], references: [businessId, id])
+  staff               Staff    @relation(fields: [businessId, staffId], references: [businessId, id])
+  service             Service  @relation(fields: [businessId, serviceId], references: [businessId, id])
+  items               HoldItem[]
+  @@unique([businessId, id])
+  @@index([staffId, startAt, endAt])
+  @@index([businessId, expiresAt])
+}
+
+model HoldItem {
+  id                  String   @id @default(uuid()) @db.Char(36)
+  businessId          String   @db.Char(36)
+  holdId              String   @db.Char(36)
+  staffId             String   @db.Char(36)
+  serviceId           String   @db.Char(36)
+  startAt             DateTime @db.DateTime(3)
+  endAt               DateTime @db.DateTime(3)
+  bufferBeforeMinutes Int      @default(0)
+  bufferAfterMinutes  Int      @default(0)
+  position            Int
+  hold                Hold     @relation(fields: [businessId, holdId], references: [businessId, id], onDelete: Cascade)
+  staff               Staff    @relation(fields: [businessId, staffId], references: [businessId, id])
+  service             Service  @relation(fields: [businessId, serviceId], references: [businessId, id])
+  @@unique([businessId, holdId, position])
+  @@index([staffId, startAt, endAt])
+}
+
+model Payment {
+  id           String        @id @default(uuid()) @db.Char(36)
+  businessId   String        @db.Char(36)
+  bookingId    String        @db.Char(36)
+  amount       Decimal       @db.Decimal(10, 2)
+  refundedAmount Decimal     @default(0) @db.Decimal(10, 2)
+  currency     String        @default("BOB") @db.Char(3)
+  method       PaymentMethod
+  status       PaymentStatus @default(PENDING)
+  receiptPath  String?       @db.VarChar(512)
+  receiptMime  String?       @db.VarChar(40)
+  reference    String?       @db.VarChar(200)
+  confirmedById String?      @db.Char(36)
+  confirmedAt  DateTime?     @db.DateTime(3)
+  reason       String?       @db.VarChar(500)
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now()) @db.DateTime(3)
+  updatedAt    DateTime      @updatedAt @db.DateTime(3)
+  booking      Booking       @relation(fields: [businessId, bookingId], references: [businessId, id])
+  refunds      PaymentRefund[]
+  @@unique([businessId, id])
+  @@index([businessId, status, createdAt])
+  @@index([businessId, bookingId])
+}
+
+// Immutable accounting entries; mutation is restricted to creating a refund in a locked payment transaction.
+model PaymentRefund {
+  id             String   @id @default(uuid()) @db.Char(36)
+  businessId     String   @db.Char(36)
+  paymentId      String   @db.Char(36)
+  amount         Decimal  @db.Decimal(10, 2)
+  reason         String   @db.VarChar(500)
+  recordedById   String   @db.Char(36)
+  idempotencyKey String   @db.VarChar(128)
+  requestHash    String   @db.Char(64)
+  createdAt      DateTime @default(now()) @db.DateTime(3)
+  payment        Payment  @relation(fields: [businessId, paymentId], references: [businessId, id])
+  recordedBy     User     @relation(fields: [businessId, recordedById], references: [businessId, id])
+  @@unique([businessId, paymentId, idempotencyKey])
+  @@index([businessId, createdAt])
+}
+
+model Reminder {
+  id          String              @id @default(uuid()) @db.Char(36)
+  businessId  String              @db.Char(36)
+  bookingId   String              @db.Char(36)
+  channel     NotificationChannel @default(EMAIL)
+  scheduledAt DateTime            @db.DateTime(3)
+  sentAt      DateTime?           @db.DateTime(3)
+  status      DeliveryStatus      @default(PENDING)
+  attempts    Int                 @default(0)
+  lastError   String?             @db.VarChar(500)
+  booking     Booking             @relation(fields: [businessId, bookingId], references: [businessId, id], onDelete: Cascade)
+  @@unique([businessId, bookingId, channel, scheduledAt])
+  @@index([status, scheduledAt])
+}
+
+model WaitlistEntry {
+  id          String         @id @default(uuid()) @db.Char(36)
+  businessId  String         @db.Char(36)
+  customerId  String         @db.Char(36)
+  locationId  String         @db.Char(36)
+  serviceId   String         @db.Char(36)
+  staffId     String?        @db.Char(36)
+  from        DateTime       @db.DateTime(3)
+  to          DateTime       @db.DateTime(3)
+  status      WaitlistStatus @default(WAITING)
+  notifiedAt  DateTime?      @db.DateTime(3)
+  createdAt   DateTime       @default(now()) @db.DateTime(3)
+  version     Int            @default(1)
+  customer    Customer       @relation(fields: [businessId, customerId], references: [businessId, id])
+  location    Location       @relation(fields: [businessId, locationId], references: [businessId, id])
+  service     Service        @relation(fields: [businessId, serviceId], references: [businessId, id])
+  staff       Staff?         @relation(fields: [businessId, staffId], references: [businessId, id])
+  @@index([businessId, locationId, serviceId, status, from])
+}
+
+model Review {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  bookingId  String   @unique @db.Char(36)
+  customerId String   @db.Char(36)
+  rating     Int
+  comment    String?  @db.VarChar(1000)
+  visible    Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.DateTime(3)
+  booking    Booking  @relation(fields: [businessId, bookingId], references: [businessId, id])
+  customer   Customer @relation(fields: [businessId, customerId], references: [businessId, id])
+  @@unique([businessId, bookingId])
+  @@index([businessId, visible, createdAt])
+}
+
+model Notification {
+  id          String              @id @default(uuid()) @db.Char(36)
+  businessId  String              @db.Char(36)
+  userId      String?             @db.Char(36)
+  recipient   String              @db.VarChar(254)
+  event       String              @db.VarChar(80)
+  channel     NotificationChannel @default(EMAIL)
+  subject     String              @db.VarChar(200)
+  body        String              @db.Text
+  payload     Json?
+  status      DeliveryStatus      @default(PENDING)
+  attempts    Int                 @default(0)
+  maxAttempts Int                 @default(5)
+  scheduledAt DateTime            @default(now()) @db.DateTime(3)
+  lockedAt    DateTime?           @db.DateTime(3)
+  sentAt      DateTime?           @db.DateTime(3)
+  readAt      DateTime?           @db.DateTime(3)
+  lastError   String?             @db.VarChar(500)
+  createdAt   DateTime            @default(now()) @db.DateTime(3)
+  user        User?               @relation(fields: [businessId, userId], references: [businessId, id])
+  @@index([status, scheduledAt])
+  @@index([businessId, userId, createdAt])
+}
+
+model DeviceToken {
+  id         String              @id @default(uuid()) @db.Char(36)
+  businessId String              @db.Char(36)
+  userId     String              @db.Char(36)
+  channel    NotificationChannel
+  tokenHash  String              @db.Char(64)
+  token      String              @db.Text
+  deviceName String?             @db.VarChar(150)
+  createdAt  DateTime            @default(now()) @db.DateTime(3)
+  updatedAt  DateTime            @updatedAt @db.DateTime(3)
+  user       User                @relation(fields: [businessId, userId], references: [businessId, id], onDelete: Cascade)
+  @@unique([businessId, tokenHash])
+  @@index([businessId, userId])
+}
+
+model RefreshSession {
+  id           String    @id @default(uuid()) @db.Char(36)
+  businessId   String    @db.Char(36)
+  userId       String    @db.Char(36)
+  tokenHash    String    @unique @db.Char(64)
+  familyId     String    @db.Char(36)
+  replacedById String?   @db.Char(36)
+  deviceName   String?   @db.VarChar(150)
+  userAgent    String?   @db.VarChar(512)
+  ip           String?   @db.VarChar(45)
+  expiresAt    DateTime  @db.DateTime(3)
+  revokedAt    DateTime? @db.DateTime(3)
+  lastUsedAt   DateTime? @db.DateTime(3)
+  createdAt    DateTime  @default(now()) @db.DateTime(3)
+  user         User      @relation(fields: [businessId, userId], references: [businessId, id], onDelete: Cascade)
+  @@index([businessId, userId, revokedAt])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model AuthToken {
+  id         String       @id @default(uuid()) @db.Char(36)
+  businessId String       @db.Char(36)
+  userId     String       @db.Char(36)
+  tokenHash  String       @unique @db.Char(64)
+  purpose    TokenPurpose
+  expiresAt  DateTime     @db.DateTime(3)
+  consumedAt DateTime?    @db.DateTime(3)
+  createdAt  DateTime     @default(now()) @db.DateTime(3)
+  user       User         @relation(fields: [businessId, userId], references: [businessId, id], onDelete: Cascade)
+  @@index([businessId, userId, purpose])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  userId     String?  @db.Char(36)
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(60)
+  entityId   String?  @db.Char(36)
+  ip         String?  @db.VarChar(45)
+  requestId  String?  @db.VarChar(64)
+  metadata   Json?
+  createdAt  DateTime @default(now()) @db.DateTime(3)
+  @@index([businessId, createdAt])
+  @@index([businessId, entityType, entityId])
+}
+
+model Setting {
+  id         String   @id @default(uuid()) @db.Char(36)
+  businessId String   @db.Char(36)
+  key        String   @db.VarChar(100)
+  value      Json
+  version    Int      @default(1)
+  updatedAt  DateTime @updatedAt @db.DateTime(3)
+  business   Business @relation(fields: [businessId], references: [id])
+  @@unique([businessId, key])
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(uuid()) @db.Char(36)
+  businessId   String   @db.Char(36)
+  key          String   @db.VarChar(128)
+  scope        String   @db.VarChar(100)
+  requestHash  String   @db.Char(64)
+  response     Json
+  statusCode   Int      @default(201)
+  createdAt    DateTime @default(now()) @db.DateTime(3)
+  expiresAt    DateTime @db.DateTime(3)
+  @@unique([businessId, scope, key])
+  @@index([expiresAt])
+}
